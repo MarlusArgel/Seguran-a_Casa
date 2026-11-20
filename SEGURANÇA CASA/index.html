@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fechamento Diário</title>
+<meta name="theme-color" content="#1f6feb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  :root{--bg:#f3f6fb;--card:#fff;--tx:#14213d;--mut:#64708a;--pri:#1f6feb;--ok:#1a9d5b;--bd:#dfe5f0}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1624;--card:#18223a;--tx:#eef2fb;--mut:#9aa7c2;--bd:#2a3656}}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .card{width:100%;max-width:440px;background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+  h1{font-size:1.4rem;margin:0 0 4px}
+  .sub{color:var(--mut);margin:0 0 22px;font-size:.95rem}
+  label.f{display:block;font-weight:600;margin-bottom:8px}
+  input[type=text]{width:100%;padding:14px;border-radius:12px;border:1px solid var(--bd);background:transparent;color:var(--tx);font-size:1rem}
+  input[type=text]:focus{outline:2px solid var(--pri);border-color:transparent}
+  button.main{width:100%;margin-top:16px;padding:14px;border:0;border-radius:12px;background:var(--pri);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+  button.main:disabled{opacity:.5;cursor:not-allowed}
+  .item{display:flex;align-items:center;gap:14px;width:100%;padding:16px;margin-bottom:12px;border-radius:14px;border:2px solid var(--bd);
+    background:transparent;color:var(--tx);font-size:1.05rem;text-align:left;cursor:pointer}
+  .item .box{width:28px;height:28px;border-radius:8px;border:2px solid var(--mut);display:grid;place-items:center;font-weight:700;color:#fff;flex:none}
+  .item.done{border-color:var(--ok);cursor:default}
+  .item.done .box{background:var(--ok);border-color:var(--ok)}
+  .item small{display:block;color:var(--mut);font-size:.8rem;margin-top:2px}
+  .who{color:var(--mut);font-size:.9rem;margin-bottom:16px}
+  .lock{text-align:center}
+  .lock .big{font-size:3.5rem;margin-bottom:8px}
+  .lock p{color:var(--mut)}
+  .hint{margin-top:14px;font-size:.85rem;color:var(--mut);text-align:center}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<main class="card">
+
+  <!-- Etapa 1: nome -->
+  <section id="vName" class="hidden">
+    <h1>🏠 Fechamento diário</h1>
+    <p class="sub" id="dateLbl"></p>
+    <label class="f" for="name">Seu nome</label>
+    <input id="name" type="text" placeholder="Digite seu nome" autocomplete="name" maxlength="60">
+    <button class="main" id="btnName" disabled>Continuar</button>
+  </section>
+
+  <!-- Etapa 2: questionário -->
+  <section id="vQuiz" class="hidden">
+    <h1>Olá, <span id="who"></span>!</h1>
+    <p class="sub">Marque o que você já fechou hoje.</p>
+    <button class="item" id="bJan"><span class="box"></span><span>Fechei as janelas<small id="tJan">Toque para marcar</small></span></button>
+    <button class="item" id="bPor"><span class="box"></span><span>Fechei as portas<small id="tPor">Toque para marcar</small></span></button>
+    <p class="hint" id="hintQuiz">Quando as duas estiverem marcadas, o app é bloqueado até amanhã.</p>
+  </section>
+
+  <!-- Bloqueado -->
+  <section id="vLock" class="hidden lock">
+    <div class="big">🔒</div>
+    <h1>Tudo fechado!</h1>
+    <p id="lockTxt"></p>
+    <p>O app está bloqueado e será liberado amanhã.</p>
+  </section>
+
+</main>
+
+<script>
+const KEY = 'fechamento-diario-v1';
+const $ = id => document.getElementById(id);
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || {days:{},lastName:''}; }catch(e){ return {days:{},lastName:''}; } }
+function save(d){ try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(e){} }
+function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function hora(iso){ return new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+
+let data = load();
+let currentDay = todayKey();
+
+function show(id){ ['vName','vQuiz','vLock'].forEach(v=>$(v).classList.toggle('hidden', v!==id)); }
+
+function mark(btn, tl, info){
+  const done = !!info;
+  btn.classList.toggle('done', done);
+  btn.querySelector('.box').textContent = done ? '✓' : '';
+  tl.textContent = done ? 'Marcado às ' + hora(info) : 'Toque para marcar';
+}
+
+function render(){
+  currentDay = todayKey();
+  const rec = data.days[currentDay];
+  $('dateLbl').textContent = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+
+  if(!rec || !rec.name){
+    $('name').value = data.lastName || '';
+    $('btnName').disabled = !$('name').value.trim();
+    show('vName'); return;
+  }
+  if(rec.janelas && rec.portas){
+    $('lockTxt').textContent = rec.name + ' fechou as janelas (' + hora(rec.janelas) + ') e as portas (' + hora(rec.portas) + ').';
+    show('vLock'); return;
+  }
+  $('who').textContent = rec.name;
+  mark($('bJan'), $('tJan'), rec.janelas);
+  mark($('bPor'), $('tPor'), rec.portas);
+  show('vQuiz');
+}
+
+$('name').addEventListener('input', e => { $('btnName').disabled = !e.target.value.trim(); });
+$('name').addEventListener('keydown', e => { if(e.key==='Enter' && !$('btnName').disabled) $('btnName').click(); });
+$('btnName').addEventListener('click', () => {
+  const n = $('name').value.trim(); if(!n) return;
+  data.lastName = n;
+  data.days[currentDay] = Object.assign({janelas:null, portas:null}, data.days[currentDay], {name:n});
+  save(data); render();
+});
+
+function toggle(field){
+  const rec = data.days[currentDay]; if(!rec || rec[field]) return;
+  rec[field] = new Date().toISOString();
+  save(data); render();
+}
+$('bJan').addEventListener('click', () => toggle('janelas'));
+$('bPor').addEventListener('click', () => toggle('portas'));
+
+// Vira o dia automaticamente (app aberto ou voltando do segundo plano)
+function checkDay(){ if(todayKey() !== currentDay){ data = load(); render(); } }
+setInterval(checkDay, 30000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) checkDay(); });
+window.addEventListener('storage', () => { data = load(); render(); });
+
+render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
